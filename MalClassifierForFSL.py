@@ -132,8 +132,13 @@ class MalClassifierForFSL(pl.LightningModule):
     preds = logits.argmax(dim=-1)
     
     logs = {'train_loss': loss}
+    self.log_dict({'loss': loss, 'acc': accuracy_score(class_labels, preds)}, on_step=True, on_epoch=True, prog_bar=True, logger=True)
 
-    return {'loss': loss, 'log': logs}
+    return {
+            "loss": loss,
+            "y_true": class_labels,
+            "y_pred": preds
+        }
   
   def training_step(self, batch, batch_idx):
     return self.__step(batch, batch_idx)
@@ -154,11 +159,11 @@ class MalClassifierForFSL(pl.LightningModule):
         y_pred += i["y_pred"]
 
     loss = loss / len(outputs)
-    cm = confusion_matrix(y_true, y_pred)
     acc = accuracy_score(y_true, y_pred)
 
     print(f'[Epoch {self.trainer.current_epoch} {state.upper()}]', f'Loss={loss}, Acc={acc}')
-
+    self.train_outputs_epoch.append({'state': state.upper(), 'epoch': self.trainer.current_epoch, 'acc': acc, 'loss': loss})
+    self.log_dict({'acc': acc, 'loss': loss}, on_step=True, on_epoch=True, prog_bar=True, logger=True)
     return {"loss": loss, "acc": acc}
               
   def configure_optimizers(self):
@@ -179,10 +184,10 @@ class MalClassifierForFSL(pl.LightningModule):
     }
 
   def _on_train_epoch_end(self, outputs):
-    self.train_outputs_epoch.append(self.__epoch_end(outputs, state="train"))
+    self.__epoch_end(outputs, state="train")
 
   def _on_validation_epoch_end(self, outputs):
-    self.val_outputs_epoch.append(self.__epoch_end(outputs, state="val"))
+    self.__epoch_end(outputs, state="val")
 
   def _on_test_epoch_end(self, outputs):
-    self.test_outputs_epoch.append(self.__epoch_end(outputs, state="test"))
+    self.__epoch_end(outputs, state="test")
